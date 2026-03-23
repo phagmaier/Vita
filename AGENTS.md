@@ -12,9 +12,7 @@ Language: Zig. Use the standard library wherever possible.
 
 ### Genome
 
-Use `std.StaticBitSet(512)` for the genome. Every organism has 512 bits allocated. Track actual used length separately.
-
-Starting genome length: 96 bits, initialized to random values.
+an array (bitset) of bits that represent a string or genome that have four Regions corresponding to how the agent interacts acts
 
 ### Region Layout
 
@@ -24,29 +22,7 @@ The genome is divided into 4 contiguous regions, always in this order:
 [attack][defense][metabolism][signal]
 ```
 
-Track region sizes with a simple array: `region_sizes: [4]u16`
-
-Index 0 = attack, 1 = defense, 2 = metabolism, 3 = signal.
-
-To find where region N starts, sum `region_sizes[0..N]`. Attack starts at bit 0. Defense starts at `region_sizes[0]`. Metabolism starts at `region_sizes[0] + region_sizes[1]`. Signal starts at `region_sizes[0] + region_sizes[1] + region_sizes[2]`.
-
-Total genome length = sum of all four region_sizes values.
-
-Starting region sizes: `[32, 32, 16, 16]`
-
 When a region grows via duplication mutation, its entry in `region_sizes` increases. If a mutation would push total length past 512, reject it.
-
-### Organism Struct
-
-```zig
-const Organism = struct {
-    genome: std.StaticBitSet(512),
-    region_sizes: [4]u16,
-    energy: u32,
-    age: u16,
-    grid_index: u32,
-};
-```
 
 ---
 
@@ -54,14 +30,6 @@ const Organism = struct {
 
 512 × 512 toroidal grid stored as a flat array of cells.
 
-### Cell Struct
-
-```zig
-const Cell = struct {
-    resources: [4]u16,
-    occupant: u32,        // index into organism pool, 0xFFFFFFFF = empty
-};
-```
 
 ### Toroidal Neighbor Lookup
 
@@ -77,15 +45,6 @@ Extract x/y from flat index: `x = index % 512`, `y = index / 512`.
 
 ## Organism Pool
 
-```zig
-const OrganismPool = struct {
-    organisms: [300000]Organism,
-    alive_list: [300000]u32,
-    alive_count: u32,
-    free_list: [300000]u32,
-    free_count: u32,
-};
-```
 
 Birth: pop index from free_list, init organism, append to alive_list, set cell occupant.
 Death: push index to free_list, swap-remove from alive_list, set cell occupant to 0xFFFFFFFF.
@@ -264,42 +223,7 @@ Initialize each genome to random bits.
 
 ## Config Struct
 
-```zig
-const Config = struct {
-    grid_width: u32 = 512,
-    grid_height: u32 = 512,
-    starting_organisms: u32 = 60000,
-    max_population: u32 = 300000,
-    starting_energy: u32 = 500,
-    starting_resources: u16 = 100,
-    starting_region_sizes: [4]u16 = .{ 32, 32, 16, 16 },
-    max_genome_bits: u16 = 512,
-    energy_per_resource: u16 = 5,
-    waste_ratio_denom: u8 = 2,
-    maintenance_base: u16 = 10,
-    maintenance_byte_denom: u16 = 8,
-    reproduction_threshold: u32 = 1000,
-    parent_energy_pct: u8 = 40,
-    child_energy_pct: u8 = 40,
-    signal_similarity_threshold: u8 = 70,
-    parasitism_threshold: u8 = 70,
-    mutualism_low: u8 = 40,
-    parasitism_steal_pct: u8 = 25,
-    mutualism_bonus: u16 = 30,
-    point_mutation_rate: u16 = 50,
-    region_duplication_rate: u16 = 50,
-    region_shrink_rate: u16 = 50,
-    insertion_rate: u16 = 30,
-    deletion_rate: u16 = 30,
-    diffusion_denom: u8 = 8,
-    injection_amount: u16 = 2,
-    injection_interval: u16 = 10,
-    age_death_base: u16 = 2,
-    age_death_byte_denom: u16 = 4,
-};
-```
-
-All rates are out of 10000 (so 50 = 0.5%, 30 = 0.3%).
+**NOTE:** All rates are out of 10000 (so 50 = 0.5%, 30 = 0.3%).
 
 ---
 
