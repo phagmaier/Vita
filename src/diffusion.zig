@@ -3,42 +3,35 @@ const Config = @import("config.zig").Config;
 const Grid = @import("grid.zig").Grid;
 const Cell = @import("grid.zig").Cell;
 
-/// Double-buffered resource diffusion. Reads from grid.cells, writes to buffer, then swaps.
+/// Double-buffered resource diffusion. Reads from grid.cells, writes to buffer.
 pub fn diffuse(grid: *Grid, buffer: []Cell, config: Config) void {
     const size = config.gridSize();
-
-    // Initialize buffer with zero resources, copy occupants
-    for (0..size) |i| {
-        buffer[i].resources = .{ 0, 0, 0, 0 };
-        buffer[i].occupant = grid.cells[i].occupant;
-    }
+    const denom = config.diffusion_denom;
 
     for (0..size) |i| {
         const neighbors = grid.neighborIndices(@intCast(i));
-        for (0..4) |r| {
-            const amount = grid.cells[i].resources[r];
-            const donate_each: u16 = amount / config.diffusion_denom;
-            const total_donated = donate_each * 4;
-            const remainder = amount - total_donated;
+        const current_cell = &grid.cells[i];
 
-            buffer[i].resources[r] += remainder;
-            for (neighbors) |n| {
-                buffer[n].resources[r] += donate_each;
-            }
+        // Copy occupant
+        buffer[i].occupant = current_cell.occupant;
+
+        inline for (0..4) |r| {
+            // Gathering approach: read from neighbors and my own remainder
+            const n_give = grid.cells[neighbors[0]].resources[r] / denom;
+            const s_give = grid.cells[neighbors[1]].resources[r] / denom;
+            const e_give = grid.cells[neighbors[2]].resources[r] / denom;
+            const w_give = grid.cells[neighbors[3]].resources[r] / denom;
+
+            const my_total = current_cell.resources[r];
+            const my_give_total = (my_total / denom) * 4;
+            const my_remainder = my_total - my_give_total;
+
+            buffer[i].resources[r] = my_remainder + n_give + s_give + e_give + w_give;
         }
     }
 
-    // Swap: copy buffer back to grid
+    // Copy buffer back to grid
     @memcpy(grid.cells, buffer);
-}
-
-/// Add injection_amount of each resource to every cell.
-pub fn inject(grid: *Grid, config: Config) void {
-    for (grid.cells) |*cell| {
-        for (0..4) |r| {
-            cell.resources[r] +|= config.injection_amount;
-        }
-    }
 }
 
 // --- Tests ---
@@ -103,5 +96,16 @@ test "diffusion spreads resources from a spike" {
     const neighbors = grid.neighborIndices(5);
     for (neighbors) |n| {
         try std.testing.expectEqual(@as(u16, 10), grid.cells[n].resources[0]);
+    }
+}
+
+/// Add injection_amount of each resource to every cell.
+pub fn inject(grid: *Grid, config: Config) void {
+    const amount = config.injection_amount;
+    for (grid.cells) |*cell| {
+        cell.resources[0] +|= amount;
+        cell.resources[1] +|= amount;
+        cell.resources[2] +|= amount;
+        cell.resources[3] +|= amount;
     }
 }
