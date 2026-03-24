@@ -39,16 +39,13 @@ pub const Grid = struct {
         const h = self.height;
         const x = index % w;
         const y = index / w;
-        return .{
-            // North
-            ((y + h - 1) % h) * w + x,
-            // South
-            ((y + 1) % h) * w + x,
-            // East
-            y * w + ((x + 1) % w),
-            // West
-            y * w + ((x + w - 1) % w),
-        };
+
+        const n = if (y == 0) (h - 1) * w + x else (y - 1) * w + x;
+        const s = if (y == h - 1) x else (y + 1) * w + x;
+        const e = if (x == w - 1) y * w else y * w + (x + 1);
+        const w_idx = if (x == 0) y * w + (w - 1) else y * w + (x - 1);
+
+        return .{ n, s, e, w_idx };
     }
 };
 
