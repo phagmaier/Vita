@@ -35,12 +35,18 @@ pub const Logger = struct {
         var total_energy: u64 = 0;
         var total_genome_len: u64 = 0;
 
-        var phenotype_set = std.AutoHashMap(u64, void).init(std.heap.page_allocator);
-        defer phenotype_set.deinit();
-        var metabolism_set = std.AutoHashMap(u64, void).init(std.heap.page_allocator);
-        defer metabolism_set.deinit();
-        var signal_set = std.AutoHashMap(u64, void).init(std.heap.page_allocator);
-        defer signal_set.deinit();
+        var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+        defer arena.deinit();
+        const aa = arena.allocator();
+
+        // Pre-allocate maps to avoid frequent resizing
+        const map_capacity = @min(pool.alive_count, 10000);
+        var phenotype_set = std.AutoHashMap(u64, void).init(aa);
+        try phenotype_set.ensureTotalCapacity(map_capacity);
+        var metabolism_set = std.AutoHashMap(u64, void).init(aa);
+        try metabolism_set.ensureTotalCapacity(map_capacity);
+        var signal_set = std.AutoHashMap(u64, void).init(aa);
+        try signal_set.ensureTotalCapacity(map_capacity);
 
         for (0..pool.alive_count) |i| {
             const org = &pool.organisms[pool.alive_list[i]];

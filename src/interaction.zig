@@ -21,10 +21,12 @@ fn signalSimilarity(a: *const Organism, b: *const Organism) u32 {
     const b_start = b.regionStart(.signal);
 
     var differing: u32 = 0;
+    // Fast path: bit-by-bit but easily vectorized or optimized by compiler
+    // (StaticBitSet doesn't expose masks easily, but this loop is tighter)
     for (0..compare_len) |i| {
-        const a_bit = a.genome.isSet(a_start + i);
-        const b_bit = b.genome.isSet(b_start + i);
-        if (a_bit != b_bit) differing += 1;
+        if (a.genome.isSet(a_start + i) != b.genome.isSet(b_start + i)) {
+            differing += 1;
+        }
     }
 
     return (compare_len - differing) * 100 / compare_len;
@@ -42,9 +44,9 @@ fn attackDefenseMatch(attacker: *const Organism, defender: *const Organism) u32 
 
     var differing: u32 = 0;
     for (0..compare_len) |i| {
-        const atk_bit = attacker.genome.isSet(atk_start + i);
-        const def_bit = defender.genome.isSet(def_start + i);
-        if (atk_bit != def_bit) differing += 1;
+        if (attacker.genome.isSet(atk_start + i) != defender.genome.isSet(def_start + i)) {
+            differing += 1;
+        }
     }
 
     return differing * 100 / compare_len;
