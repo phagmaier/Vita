@@ -9,6 +9,7 @@ pub const Cell = struct {
 
 pub const Grid = struct {
     cells: []Cell,
+    neighbors: []u32, // Precomputed flat table: [N, S, E, W] per cell, stride 4
     width: u32,
     height: u32,
     allocator: std.mem.Allocator,
@@ -22,30 +23,47 @@ pub const Grid = struct {
                 .occupant = EMPTY,
             };
         }
+
+        // Precompute neighbor indices once — eliminates division/modulo in the hot path
+        const neighbors = try allocator.alloc(u32, size * 4);
+        const w = config.grid_width;
+        const h = config.grid_height;
+        for (0..size) |idx| {
+            const i: u32 = @intCast(idx);
+            const x = i % w;
+            const y = i / w;
+            const n = if (y == 0) (h - 1) * w + x else (y - 1) * w + x;
+            const s = if (y == h - 1) x else (y + 1) * w + x;
+            const e = if (x == w - 1) y * w else y * w + (x + 1);
+            const ww = if (x == 0) y * w + (w - 1) else y * w + (x - 1);
+            neighbors[idx * 4 + 0] = n;
+            neighbors[idx * 4 + 1] = s;
+            neighbors[idx * 4 + 2] = e;
+            neighbors[idx * 4 + 3] = ww;
+        }
+
         return Grid{
             .cells = cells,
-            .width = config.grid_width,
-            .height = config.grid_height,
+            .neighbors = neighbors,
+            .width = w,
+            .height = h,
             .allocator = allocator,
         };
     }
 
     pub fn deinit(self: *Grid) void {
         self.allocator.free(self.cells);
+        self.allocator.free(self.neighbors);
     }
 
     pub fn neighborIndices(self: *const Grid, index: u32) [4]u32 {
-        const w = self.width;
-        const h = self.height;
-        const x = index % w;
-        const y = index / w;
-
-        const n = if (y == 0) (h - 1) * w + x else (y - 1) * w + x;
-        const s = if (y == h - 1) x else (y + 1) * w + x;
-        const e = if (x == w - 1) y * w else y * w + (x + 1);
-        const w_idx = if (x == 0) y * w + (w - 1) else y * w + (x - 1);
-
-        return .{ n, s, e, w_idx };
+        const base: usize = @as(usize, index) * 4;
+        return .{
+            self.neighbors[base],
+            self.neighbors[base + 1],
+            self.neighbors[base + 2],
+            self.neighbors[base + 3],
+        };
     }
 };
 

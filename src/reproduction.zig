@@ -52,13 +52,29 @@ fn shiftBitsLeft(genome: *std.StaticBitSet(GENOME_BITS), start: u16, end: u16, c
     }
 }
 
-/// Apply point mutations: flip each bit with probability point_mutation_rate/10000.
+/// Sample from geometric distribution: number of failures before first success.
+/// P(X = k) = (1-p)^k * p.  Pass log(1-p) precomputed to avoid recomputing each call.
+inline fn geometricSample(rng: std.Random, log_1_minus_p: f32) u32 {
+    // Inverse transform: floor(log(U) / log(1-p)) for U ~ Uniform(0,1)
+    const u = rng.float(f32);
+    const safe_u: f32 = if (u > 0.0) u else 1e-7;
+    return @intFromFloat(@floor(@log(safe_u) / log_1_minus_p));
+}
+
+/// Apply point mutations using geometric distribution to jump to each mutated bit.
+/// Reduces RNG calls from O(genome_len) to O(expected_mutations) — ~96x fewer calls at 0.5% rate.
 fn pointMutation(child: *Organism, rng: std.Random, config: Config) void {
-    const total_len = child.totalGenomeLen();
-    for (0..total_len) |i| {
-        if (rng.intRangeAtMost(u16, 0, 9999) < config.point_mutation_rate) {
-            child.genome.toggle(i);
-        }
+    if (config.point_mutation_rate == 0) return;
+    const total_len: u32 = child.totalGenomeLen();
+    if (total_len == 0) return;
+
+    const p: f32 = @as(f32, @floatFromInt(config.point_mutation_rate)) / 10000.0;
+    const log_1_minus_p = @log(1.0 - p);
+
+    var pos: u32 = geometricSample(rng, log_1_minus_p);
+    while (pos < total_len) {
+        child.genome.toggle(pos);
+        pos += 1 + geometricSample(rng, log_1_minus_p);
     }
 }
 
