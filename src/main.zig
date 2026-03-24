@@ -120,7 +120,7 @@ pub fn main() !void {
 
             // Handle death
             if (died) {
-                pool.kill(&grid, i);
+                pool.killInLoop(&grid, i, loop_count);
                 loop_count -= 1;
                 logger.recordDeath();
                 // Don't advance i — swap-remove put a new organism at this index

@@ -63,7 +63,7 @@ pub fn processInteraction(actor: *Organism, neighbor: *Organism, config: Config)
 
     if (match_pct >= config.parasitism_threshold) {
         // Parasitism: attacker steals energy
-        const steal = neighbor.energy / (100 / @as(u32, config.parasitism_steal_pct));
+        const steal = (neighbor.energy * @as(u32, config.parasitism_steal_pct)) / 100;
         neighbor.energy -|= steal;
         actor.energy += steal;
         return .parasitism;

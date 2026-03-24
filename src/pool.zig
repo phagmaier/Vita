@@ -95,6 +95,34 @@ pub const OrganismPool = struct {
         }
     }
 
+    /// Kill the organism during a processing loop, preserving the split between
+    /// current tick actors and newborns.
+    pub fn killInLoop(self: *OrganismPool, grid: *Grid, alive_index: u32, loop_count: u32) void {
+        const pool_index = self.alive_list[alive_index];
+        const org = &self.organisms[pool_index];
+
+        grid.cells[org.grid_index].occupant = EMPTY;
+        self.free_list[self.free_count] = pool_index;
+        self.free_count += 1;
+
+        self.alive_count -= 1;
+
+        const last_in_loop = loop_count - 1;
+        const last_overall = self.alive_count;
+
+        if (alive_index < last_in_loop) {
+            // Swap current with the last in the loop snapshot
+            self.alive_list[alive_index] = self.alive_list[last_in_loop];
+            // Swap vacated loop position with the last overall (a newborn)
+            if (last_in_loop < last_overall) {
+                self.alive_list[last_in_loop] = self.alive_list[last_overall];
+            }
+        } else if (alive_index < last_overall) {
+            // Just swap with the last overall
+            self.alive_list[alive_index] = self.alive_list[last_overall];
+        }
+    }
+
     /// Shuffle alive_list using Fisher-Yates.
     pub fn shuffleAliveList(self: *OrganismPool, rng: std.Random) void {
         if (self.alive_count <= 1) return;
@@ -142,6 +170,46 @@ test "spawn and kill cycle" {
     _ = idx3;
     try std.testing.expectEqual(@as(u32, 3), pool.alive_count);
     try std.testing.expectEqual(@as(u32, 7), pool.free_count);
+}
+
+test "killInLoop correctly swaps for snapshot safety" {
+    const allocator = std.testing.allocator;
+    const config = Config{ .grid_width = 4, .grid_height = 4, .max_population = 10 };
+    var grid = try Grid.init(allocator, config);
+    defer grid.deinit();
+    var pool = try OrganismPool.init(allocator, config);
+    defer pool.deinit();
+
+    var prng = std.Random.DefaultPrng.init(42);
+    const rng = prng.random();
+
+    // 1. Initial population: [A, B, C]
+    const idxA = pool.spawn(&grid, 0, rng, config).?;
+    _ = pool.spawn(&grid, 1, rng, config).?; // idxB
+    const idxC = pool.spawn(&grid, 2, rng, config).?;
+
+    const loop_count: u32 = 3;
+
+    // 2. Births: [A, B, C, D, E]
+    const idxD = pool.spawn(&grid, 3, rng, config).?;
+    const idxE = pool.spawn(&grid, 4, rng, config).?;
+
+    try std.testing.expectEqual(@as(u32, 5), pool.alive_count);
+    try std.testing.expectEqual(idxE, pool.alive_list[4]);
+
+    // 3. B dies at index 1.
+    // loop_count=3, so A, B, C are in scope.
+    // killInLoop(1, 3) should:
+    // - Swap B with C (index 1 < loop_count-1)
+    // - Swap C's old position (2) with E (index 4)
+    pool.killInLoop(&grid, 1, loop_count);
+
+    // Expected: [A, C, E, D]
+    try std.testing.expectEqual(idxA, pool.alive_list[0]);
+    try std.testing.expectEqual(idxC, pool.alive_list[1]);
+    try std.testing.expectEqual(idxE, pool.alive_list[2]);
+    try std.testing.expectEqual(idxD, pool.alive_list[3]);
+    try std.testing.expectEqual(@as(u32, 4), pool.alive_count);
 }
 
 test "pool full returns null" {
