@@ -8,14 +8,18 @@ pub const Logger = struct {
     file: std.fs.File,
     births_this_interval: u32,
     deaths_this_interval: u32,
+    parasitism_this_interval: u32,
+    mutualism_this_interval: u32,
 
     pub fn init(path: []const u8) !Logger {
         const file = try std.fs.cwd().createFile(path, .{});
-        try file.writeAll("tick,alive_count,births,deaths,mean_energy,mean_genome_len,unique_phenotypes,metabolic_diversity,signal_clusters,total_resources\n");
+        try file.writeAll("tick,alive_count,births,deaths,mean_energy,mean_genome_len,unique_phenotypes,metabolic_diversity,signal_clusters,total_resources,parasitism_events,mutualism_events\n");
         return Logger{
             .file = file,
             .births_this_interval = 0,
             .deaths_this_interval = 0,
+            .parasitism_this_interval = 0,
+            .mutualism_this_interval = 0,
         };
     }
 
@@ -29,6 +33,14 @@ pub const Logger = struct {
 
     pub fn recordDeath(self: *Logger) void {
         self.deaths_this_interval += 1;
+    }
+
+    pub fn recordParasitism(self: *Logger) void {
+        self.parasitism_this_interval += 1;
+    }
+
+    pub fn recordMutualism(self: *Logger) void {
+        self.mutualism_this_interval += 1;
     }
 
     pub fn logTick(self: *Logger, tick: u64, pool: *const OrganismPool, grid: *const Grid) !void {
@@ -74,7 +86,7 @@ pub const Logger = struct {
 
         // Format line into a stack buffer then write
         var fmt_buf: [512]u8 = undefined;
-        const line = std.fmt.bufPrint(&fmt_buf, "{},{},{},{},{},{},{},{},{},{}\n", .{
+        const line = std.fmt.bufPrint(&fmt_buf, "{},{},{},{},{},{},{},{},{},{},{},{}\n", .{
             tick,
             alive,
             self.births_this_interval,
@@ -85,12 +97,16 @@ pub const Logger = struct {
             metabolism_set.count(),
             signal_set.count(),
             total_resources,
+            self.parasitism_this_interval,
+            self.mutualism_this_interval,
         }) catch return;
 
         _ = self.file.writeAll(line) catch {};
 
         self.births_this_interval = 0;
         self.deaths_this_interval = 0;
+        self.parasitism_this_interval = 0;
+        self.mutualism_this_interval = 0;
     }
 };
 

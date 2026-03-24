@@ -103,7 +103,11 @@ pub fn main() !void {
                 const neighbor_occupant = grid.cells[neighbor_cell_idx].occupant;
                 if (neighbor_occupant != EMPTY) {
                     const neighbor = &pool.organisms[neighbor_occupant];
-                    _ = interaction.processInteraction(org, neighbor, config);
+                    switch (interaction.processInteraction(org, neighbor, config)) {
+                        .parasitism => logger.recordParasitism(),
+                        .mutualism => logger.recordMutualism(),
+                        else => {},
+                    }
                 }
             }
 
