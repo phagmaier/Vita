@@ -8,11 +8,12 @@
 - `src/interaction.zig` — deals with agent interaction logic
 - `src/logger.zig` — logs data 
 - `src/logger.zig` — logs data 
-- `main.zig` - What runs the code
-- `metabolism.zig` - Metabolism logic
-- `organism.zig` - The organism struct
-- `pool.zig` - the organism pool the container of the agents
-- `reproduction.zig` - Reproduction engine and logic
+- `src/main.zig` - What runs the code
+- `src/metabolism.zig` - Metabolism logic
+- `src/organism.zig` - The organism struct
+- `src/pool.zig` - the organism pool the container of the agents
+- `src/reproduction.zig` - Reproduction engine and logic
+- `visualize.py` - Helps us visualize the logged data in order to help tune the params of the mode
 
 
 ## What We Are Building
