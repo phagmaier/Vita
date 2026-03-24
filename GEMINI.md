@@ -1,5 +1,20 @@
 # Red Queen Bitstring Ecosystem — Implementation Spec (Zig)
 
+
+## Files
+- `src/config.zig` — Has the constants and the configuration and starting point for the agents and the world
+- `src/death.zig` — Checks if an should die and has some tests
+- `src/grid.zig` — The actual grid of the world
+- `src/interaction.zig` — deals with agent interaction logic
+- `src/logger.zig` — logs data 
+- `src/logger.zig` — logs data 
+- `main.zig` - What runs the code
+- `metabolism.zig` - Metabolism logic
+- `organism.zig` - The organism struct
+- `pool.zig` - the organism pool the container of the agents
+- `reproduction.zig` - Reproduction engine and logic
+
+
 ## What We Are Building
 
 An artificial life simulation where organisms are bitstring genomes living on a 2D toroidal grid. Organisms consume resources, interact with neighbors via lock-and-key bitstring matching (parasitism or mutualism), reproduce with mutation, and die. The goal is to produce sustained co-evolutionary arms races.
