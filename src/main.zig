@@ -25,7 +25,11 @@ const diffusion = diffusion_mod;
 const Logger = logger_mod.Logger;
 
 pub fn main() !void {
-    const allocator = std.heap.smp_allocator;
+    var da = std.heap.DebugAllocator(.{}){};
+    const allocator = if (builtin.mode == .Debug)
+        da.allocator()
+    else
+        std.heap.smp_allocator;
 
     const config = Config{};
 
