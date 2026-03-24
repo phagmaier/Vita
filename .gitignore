@@ -1,0 +1,3 @@
+.zig-cache/
+zig-out/
+vita_log.csv
