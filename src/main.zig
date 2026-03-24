@@ -159,6 +159,9 @@ pub fn main() !void {
     }
 
     std.debug.print("Simulation complete. {} ticks, {} alive.\n", .{ tick, pool.alive_count });
+    if (builtin.mode == .Debug) {
+        _ = da.deinit();
+    }
 }
 
 test {
