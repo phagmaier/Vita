@@ -10,6 +10,44 @@ pub const InteractionResult = enum {
     parasitism,
 };
 
+// StaticBitSet(512) uses ArrayBitSet(usize, 512) internally: 8 x u64 words.
+const MASK_BITS: u16 = @bitSizeOf(usize); // 64 on 64-bit
+const NUM_MASKS: u16 = GENOME_BITS / MASK_BITS; // 8
+
+/// Extract up to MASK_BITS bits from a genome starting at bit `start` (LSB-first).
+inline fn extractWord(genome: *const std.StaticBitSet(GENOME_BITS), start: u16) usize {
+    const word_idx = start / MASK_BITS;
+    const bit_off: std.math.Log2Int(usize) = @intCast(start % MASK_BITS);
+    const lo = genome.masks[word_idx] >> bit_off;
+    if (bit_off == 0) return lo;
+    const hi_shift: std.math.Log2Int(usize) = @intCast(MASK_BITS - @as(u32, bit_off));
+    const hi: usize = if (word_idx + 1 < NUM_MASKS) genome.masks[word_idx + 1] << hi_shift else 0;
+    return lo | hi;
+}
+
+/// Count differing bits between two genome ranges using word-level XOR + popcount.
+/// ~32-64x faster than bit-by-bit for large regions.
+fn countDifferingBits(
+    a: *const std.StaticBitSet(GENOME_BITS),
+    a_start: u16,
+    b: *const std.StaticBitSet(GENOME_BITS),
+    b_start: u16,
+    len: u16,
+) u32 {
+    var differing: u32 = 0;
+    var offset: u16 = 0;
+    while (offset + MASK_BITS <= len) {
+        differing += @popCount(extractWord(a, a_start + offset) ^ extractWord(b, b_start + offset));
+        offset += MASK_BITS;
+    }
+    if (offset < len) {
+        const remaining: std.math.Log2Int(usize) = @intCast(len - offset);
+        const mask: usize = (@as(usize, 1) << remaining) - 1;
+        differing += @popCount((extractWord(a, a_start + offset) ^ extractWord(b, b_start + offset)) & mask);
+    }
+    return differing;
+}
+
 /// Compare signal regions of two organisms. Returns similarity percentage (0-100).
 fn signalSimilarity(a: *const Organism, b: *const Organism) u32 {
     const a_len = a.region_sizes[3]; // signal
@@ -20,15 +58,7 @@ fn signalSimilarity(a: *const Organism, b: *const Organism) u32 {
     const a_start = a.regionStart(.signal);
     const b_start = b.regionStart(.signal);
 
-    var differing: u32 = 0;
-    // Fast path: bit-by-bit but easily vectorized or optimized by compiler
-    // (StaticBitSet doesn't expose masks easily, but this loop is tighter)
-    for (0..compare_len) |i| {
-        if (a.genome.isSet(a_start + i) != b.genome.isSet(b_start + i)) {
-            differing += 1;
-        }
-    }
-
+    const differing = countDifferingBits(&a.genome, a_start, &b.genome, b_start, compare_len);
     return (compare_len - differing) * 100 / compare_len;
 }
 
@@ -42,13 +72,7 @@ fn attackDefenseMatch(attacker: *const Organism, defender: *const Organism) u32 
     const atk_start = attacker.regionStart(.attack);
     const def_start = defender.regionStart(.defense);
 
-    var differing: u32 = 0;
-    for (0..compare_len) |i| {
-        if (attacker.genome.isSet(atk_start + i) != defender.genome.isSet(def_start + i)) {
-            differing += 1;
-        }
-    }
-
+    const differing = countDifferingBits(&attacker.genome, atk_start, &defender.genome, def_start, compare_len);
     return differing * 100 / compare_len;
 }
 

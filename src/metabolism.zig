@@ -14,11 +14,22 @@ const WASTE_MAP = [4]usize{ 1, 0, 3, 2 };
 pub fn processMetabolism(org: *Organism, cell: *Cell, config: Config) MetabolismResult {
     var total_consumed: u32 = 0;
 
+    // Compute region start once — avoids 16 redundant regionStart() calls
+    const met_start = org.regionStart(.metabolism);
+    const met_size = org.region_sizes[2];
+
     // Read 4-bit affinities and consume resources
     for (0..4) |i| {
-        const affinity: u16 = org.read4BitValue(.metabolism, @intCast(i));
+        const base: u16 = @as(u16, @intCast(i)) * 4;
+        var affinity: u16 = 0;
+        inline for (0..4) |bit| {
+            const bit_pos: u16 = base + @as(u16, @intCast(bit));
+            if (bit_pos < met_size and org.genome.isSet(met_start + bit_pos)) {
+                affinity |= @as(u16, 1) << @intCast(bit);
+            }
+        }
         const available = cell.resources[i];
-        const consumed = @min(affinity, available);
+        const consumed: u16 = @intCast(@min(affinity, available));
         cell.resources[i] -= consumed;
         total_consumed += consumed;
 
